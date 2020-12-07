@@ -31,7 +31,7 @@ type AppEnv struct {
 var appEnv AppEnv
 
 func main() {
-	if err := env.Validate(&appEnv, os.Getenv); err != nil {
+	if err := env.New(&appEnv).Validate(); err != nil {
 		log.Fatalf("Invalid environment: %v", err)
 	}
 	log.Printf("Beep is %s, Boop is %s, Brrt is %s", appEnv.Beep, appEnv.Boop, appEnv.Brrt)
