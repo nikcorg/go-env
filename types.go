@@ -1,5 +1,7 @@
 package env
 
+import "fmt"
+
 // Env is in interface for reading the environment with assertions
 type Env interface {
 	Validate(interface{}) interface{}
@@ -8,12 +10,12 @@ type Env interface {
 // Int is an optional int value
 type Int int
 
-func (v Int) String() string { return string(v) }
+func (v Int) String() string { return fmt.Sprintf("%d", v) }
 
 // NonEmptyInt is a required int value
 type NonEmptyInt int
 
-func (v NonEmptyInt) String() string { return string(v) }
+func (v NonEmptyInt) String() string { return fmt.Sprintf("%d", v) }
 
 // URL is an optional URL value
 type URL string

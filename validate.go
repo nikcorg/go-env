@@ -5,15 +5,37 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 )
 
-const tagName = "env"
+const envTag = "env"
+const fallbackTag = "default"
+
+// AssertedEnvironment represents an environment configuration and a value getter
+type AssertedEnvironment struct {
+	config interface{}
+	reader func(string) string
+}
+
+// New constructs a new AssertedEnvironment using a provided value getter
+func New(config interface{}, reader func(string) string) *AssertedEnvironment {
+	return &AssertedEnvironment{config, reader}
+}
+
+// NewFromEnv constructs a new AssertedEnvironment using os.Getenv as the assigned value getter
+func NewFromEnv(config interface{}) *AssertedEnvironment {
+	return &AssertedEnvironment{config, os.Getenv}
+}
 
 // Validate reads and validates the environment values
-func Validate(a interface{}, ValueFromEnv func(string) string) error {
+func (e *AssertedEnvironment) Validate() error {
+	return validate(e.config, e.reader)
+}
+
+func validate(a interface{}, ValueFromEnv func(string) string) error {
 	reflectType := reflect.TypeOf(a)
 
 	if reflectType.Kind() != reflect.Ptr {
@@ -51,58 +73,74 @@ func getValue(t reflect.Type, ValueFromEnv func(string) string) (reflect.Value, 
 			return reflect.Value{}, fmt.Errorf("unexported field error: %s", f.Name)
 		}
 
-		tag := f.Tag.Get(tagName)
-		val := ValueFromEnv(tag)
-		typ := v.Field(i).Type()
+		var (
+			ok                           bool
+			candidate, envName, fallback string
+			typ                          reflect.Type
+		)
+
+		if envName, ok = f.Tag.Lookup(envTag); !ok {
+			return reflect.Value{}, fmt.Errorf("no tag set for %s", f.Name)
+		}
+
+		candidate = ValueFromEnv(envName)
+
+		if candidate == "" {
+			if fallback, ok = f.Tag.Lookup(fallbackTag); ok {
+				candidate = fallback
+			}
+		}
+
+		typ = v.Field(i).Type()
 
 		switch typ.String() {
 		case "env.Int":
-			valid, err := asInt(val)
+			valid, err := asInt(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.NonEmptyInt":
-			valid, err := asNotEmptyInt(val)
+			valid, err := asNotEmptyInt(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.String":
-			v.Field(i).Set(reflect.ValueOf(val).Convert(typ))
+			v.Field(i).Set(reflect.ValueOf(candidate).Convert(typ))
 			break
 		case "env.NonEmptyString":
-			valid, err := asNotEmpty(val)
+			valid, err := asNotEmpty(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.URL":
-			valid, err := asURL(val)
+			valid, err := asURL(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.NonEmptyURL":
-			valid, err := asNotEmptyURL(val)
+			valid, err := asNotEmptyURL(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.Enum":
-			valid, err := asEnum(val, f.Tag.Get("enum"))
+			valid, err := asEnum(candidate, f.Tag.Get("enum"))
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 			break
 		case "env.NonEmptyEnum":
-			valid, err := asNotEmptyEnum(val, f.Tag.Get("enum"))
+			valid, err := asNotEmptyEnum(candidate, f.Tag.Get("enum"))
 			if err != nil {
 				return reflect.Value{}, err
 			}
