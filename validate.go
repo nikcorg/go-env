@@ -14,6 +14,11 @@ import (
 const envTag = "env"
 const fallbackTag = "default"
 
+// Known error outcomes
+var (
+	ErrExpectedAtLeastOneValue = fmt.Errorf("expected at least one value")
+)
+
 // AssertedEnvironment represents an environment configuration and a value getter
 type AssertedEnvironment struct {
 	config interface{}
@@ -33,6 +38,13 @@ func NewFromEnv(config interface{}) *AssertedEnvironment {
 // Validate reads and validates the environment values
 func (e *AssertedEnvironment) Validate() error {
 	return validate(e.config, e.reader)
+}
+
+// MustValidate validates the environment and panics on any validation error
+func (e *AssertedEnvironment) MustValidate() {
+	if err := validate(e.config, e.reader); err != nil {
+		panic(err)
+	}
 }
 
 func validate(a interface{}, ValueFromEnv func(string) string) error {
@@ -100,52 +112,79 @@ func getValue(t reflect.Type, ValueFromEnv func(string) string) (reflect.Value, 
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.NonEmptyInt":
 			valid, err := asNotEmptyInt(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.String":
 			v.Field(i).Set(reflect.ValueOf(candidate).Convert(typ))
-			break
+
 		case "env.NonEmptyString":
 			valid, err := asNotEmpty(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.URL":
 			valid, err := asURL(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.NonEmptyURL":
 			valid, err := asNotEmptyURL(candidate)
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.Enum":
 			valid, err := asEnum(candidate, f.Tag.Get("enum"))
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
 		case "env.NonEmptyEnum":
 			valid, err := asNotEmptyEnum(candidate, f.Tag.Get("enum"))
 			if err != nil {
 				return reflect.Value{}, err
 			}
 			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
-			break
+
+		case "env.StringSlice":
+			valid, err := asStringSlice(candidate, f.Tag.Get("separator"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
+
+		case "env.NonEmptyStringSlice":
+			valid, err := asNonEmptyStringSlice(candidate, f.Tag.Get("separator"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
+
+		case "env.IntSlice":
+			valid, err := asIntSlice(candidate, f.Tag.Get("separator"), asInt)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
+
+		case "env.NonEmptyIntSlice":
+			valid, err := asNonEmptyIntSlice(candidate, f.Tag.Get("separator"))
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			v.Field(i).Set(reflect.ValueOf(valid).Convert(typ))
 		default:
 			return reflect.Value{}, fmt.Errorf("unknown field type: %s", typ)
 		}
@@ -157,7 +196,7 @@ func getValue(t reflect.Type, ValueFromEnv func(string) string) (reflect.Value, 
 // asNotEmpty validates input is not the empty string
 func asNotEmpty(s string) (string, error) {
 	if s == "" {
-		return s, fmt.Errorf("Expected string to be non-empty")
+		return s, fmt.Errorf("Expected nonempty value")
 	}
 
 	return s, nil
@@ -229,6 +268,59 @@ func asNotEmptyEnum(s, vals string) (string, error) {
 		return "", err
 	}
 	return asEnum(s, vals)
+}
+
+// asStringSlice splits a string value by a separator
+// If a separator is not provided the comma is used
+func asStringSlice(s, separator string) ([]string, error) {
+	splitBy := separator
+	if splitBy == "" {
+		splitBy = ","
+	}
+	return strings.Split(s, splitBy), nil
+}
+
+// asNonEmptyStringSlice validates that the input is not empty
+func asNonEmptyStringSlice(s, separator string) ([]string, error) {
+	v, err := asStringSlice(s, separator)
+	if err != nil {
+		return nil, err
+	}
+	if len(v) == 0 {
+		return nil, ErrExpectedAtLeastOneValue
+	}
+	return v, nil
+}
+
+type intParser func(string) (int, error)
+
+// asIntSlice splits a string value by a separator and validates the each value can be parsed as an int
+// If a separator is not provided the comma is used
+func asIntSlice(s, separator string, p intParser) ([]int, error) {
+	stringVals, err := asStringSlice(s, separator)
+	if err != nil {
+		return nil, err
+	}
+	intVals := make([]int, len(stringVals))
+	for n := range stringVals {
+		intVals[n], err = p(stringVals[n])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return intVals, nil
+}
+
+// asNonEmptyIntSlice validates that the input is not empty
+func asNonEmptyIntSlice(s, separator string) ([]int, error) {
+	v, err := asIntSlice(s, separator, asNotEmptyInt)
+	if err != nil {
+		return nil, err
+	}
+	if len(v) == 0 {
+		return nil, ErrExpectedAtLeastOneValue
+	}
+	return v, nil
 }
 
 func contains(xs []string, x string) bool {

@@ -1,6 +1,10 @@
 package env
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Env is in interface for reading the environment with assertions
 type Env interface {
@@ -46,3 +50,35 @@ func (x Enum) String() string { return string(x) }
 type NonEmptyEnum string
 
 func (x NonEmptyEnum) String() string { return string(x) }
+
+// StringSlice is a CSV value
+type StringSlice []string
+
+func (x StringSlice) String() string { return strings.Join(x, ",") }
+
+// NonEmptyStringSlice is a StringSlice value with a length > 0 requirement
+type NonEmptyStringSlice []string
+
+func (x NonEmptyStringSlice) String() string { return strings.Join(x, ",") }
+
+// IntSlice is a CSV value
+type IntSlice []int
+
+func (x IntSlice) String() string {
+	out := ""
+	for _, s := range x {
+		out += "," + strconv.Itoa(s)
+	}
+	return out[1:]
+}
+
+// NonEmptyIntSlice is an IntSlice value with a length > 0 requirement
+type NonEmptyIntSlice []int
+
+func (x NonEmptyIntSlice) String() string {
+	out := ""
+	for _, s := range x {
+		out += "," + strconv.Itoa(s)
+	}
+	return out[1:]
+}
