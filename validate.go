@@ -28,33 +28,41 @@ var (
 	ErrInvalidEnumValue        = errors.New("invalid enum value")
 )
 
+// Options represents the library's configurable traits
+type Options struct {
+	Getenv Getter
+}
+
 // AssertedEnvironment represents an environment configuration and a value getter
 type AssertedEnvironment struct {
 	config interface{}
-	reader func(string) string
+	opts   *Options
 }
 
 // Getter is used to retrieve values for populating an environment structure
 type Getter func(string) string
 
-// New constructs a new AssertedEnvironment using a provided value getter
-func New(config interface{}, reader Getter) *AssertedEnvironment {
-	return &AssertedEnvironment{config, reader}
-}
+var defaultConfig = Options{os.Getenv}
 
-// NewFromEnv constructs a new AssertedEnvironment using os.Getenv as the assigned value getter
-func NewFromEnv(config interface{}) *AssertedEnvironment {
-	return &AssertedEnvironment{config, os.Getenv}
+// New constructs a new AssertedEnvironment using a provided value getter
+func New(config interface{}, opts ...*Options) *AssertedEnvironment {
+	options := &Options{defaultConfig.Getenv}
+
+	for _, o := range opts {
+		options.Getenv = o.Getenv
+	}
+
+	return &AssertedEnvironment{config, options}
 }
 
 // Validate reads and validates the environment values
 func (e *AssertedEnvironment) Validate() error {
-	return validate(e.config, e.reader)
+	return validate(e.config, e.opts.Getenv)
 }
 
 // MustValidate validates the environment and panics on any validation error
 func (e *AssertedEnvironment) MustValidate() {
-	if err := validate(e.config, e.reader); err != nil {
+	if err := validate(e.config, e.opts.Getenv); err != nil {
 		panic(err)
 	}
 }

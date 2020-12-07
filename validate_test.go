@@ -353,14 +353,13 @@ func TestSimple(t *testing.T) {
 		},
 	}
 
-	makeEnvGetter := func(e map[string]string) func(string) string {
-		return func(k string) string {
-			return e[k]
-		}
+	configForEnv := func(e map[string]string) *Options {
+		getter := func(k string) string { return e[k] }
+		return &Options{getter}
 	}
 
 	for _, test := range tests {
-		e := New(&test.config, makeEnvGetter(test.env))
+		e := New(&test.config, configForEnv(test.env))
 		err := e.Validate()
 
 		if test.shouldError {
