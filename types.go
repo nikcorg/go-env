@@ -31,6 +31,24 @@ type NonEmptyURL string
 
 func (v NonEmptyURL) String() string { return string(v) }
 
+// HostPort is an optional value that is successfully parsed using net.SplitHostPort
+type HostPort struct {
+	Host string
+	Port string
+}
+
+func (v HostPort) String() string {
+	if strings.Contains(v.Host, ":") {
+		return fmt.Sprintf("[%s]:%s", v.Host, v.Port)
+	}
+	return fmt.Sprintf("%s:%s", v.Host, v.Port)
+}
+
+// NonEmptyHostPort is a required HostPort value
+type NonEmptyHostPort HostPort
+
+func (v NonEmptyHostPort) String() string { return HostPort(v).String() }
+
 // String is an optional string value
 type String string
 

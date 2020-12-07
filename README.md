@@ -15,9 +15,17 @@ import (
 )
 
 type AppEnv struct {
+	// Require the value `BEEP` is not empty
 	Beep env.NonEmptyString `env:"BEEP"`
+
+	// Require the value `BOOP` to be one of `tesing`, `one` or `two`
 	Boop env.Enum           `env:"BOOP" enum:"testing,one,two"`
+
+	// Use the value from `BRRT` or default to `ding dong`
 	Brrt env.String         `env:"BRRT" default:"ding dong"`
+
+	// Split the value from `BZZT` using `:` and parse as int values
+	Bzzt env.IntSlice       `env:"BZZT" separator:":"`
 }
 
 var appEnv AppEnv
@@ -32,9 +40,12 @@ func main() {
 
 ## Supported validations
 
-- `Int` / `NonEmptyInt` - ensure the value is parseable as a number
-- `URL` / `NonEmptyUrl` - ensure the value is parseable as a URL
-- `String` / `NonEmptyString` - no formal validation
-- `Enum` / `NonEmptyEnum` - ensure the value matches one of the enumerated set of acceptable values
+- `Enum` - ensure the value matches one of the enumerated set of acceptable values
+- `HostPort` - takes a string value and ensures it can be parsed by `net.SplitHostPort`
+- `IntSlice` takes a CSV value and splits it into an int slice using a separator
+- `Int` - ensures the value is parseable as a number
+- `StringSlice` - takes a CSV value and splits it into a string slice using a separator
+- `String` - no formal validation
+- `URL` - ensures the value is parseable as a `url.URL` and has a non-empty `Scheme` and a `Host` value
 
-Each validation's `NonEmpty*` variant adds an additional assertion on the value not being unset.
+Each validation `T` has a `NonEmptyT` variant, which adds an additional assertion on the value not being unset.
